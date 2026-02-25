@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Habits">
+<title>Habits</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Playfair+Display:ital,wght@0,400;1,400&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body { background: #000000; }
+
+  body {
+    background: #000000;
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  /* ════════════════════════════
+     TODAY VIEW
+  ════════════════════════════ */
+  #today-view {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: max(env(safe-area-inset-top), 52px) 34px max(env(safe-area-inset-bottom), 52px);
+  }
+
+  .day-label {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 12px;
+    color: #1e1e1e;
+    margin-bottom: 48px;
+    letter-spacing: 0.05em;
+  }
+
+  .habit-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 19px 0;
+    border-bottom: 1px solid #080808;
+    cursor: pointer;
+    -webkit-touch-callout: none;
+  }
+  .habit-item:first-of-type { border-top: 1px solid #080808; }
+
+  .habit-name {
+    font-size: 16px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+    flex: 1;
+    transition: opacity 0.35s ease;
+  }
+
+  .habit-check {
+    width: 21px; height: 21px;
+    border: 1px solid #1a1a1a;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.28s ease;
+  }
+  .habit-check svg { opacity: 0; transition: opacity 0.2s; }
+
+  .habit-item.completing .habit-name { opacity: 0.15; }
+  .habit-item.completing .habit-check { background: #fff; border-color: #fff; }
+  .habit-item.completing .habit-check svg { opacity: 1; }
+
+  .phrase {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 20px;
+    color: #111;
+    padding: 40px 0;
+    line-height: 1.5;
+  }
+
+  /* hidden gesture zones */
+  #gesture-stats {
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 50%; height: 60px;
+    z-index: 10;
+  }
+  #gesture-edit {
+    position: fixed;
+    bottom: 0; right: 0;
+    width: 50%; height: 60px;
+    z-index: 10;
+  }
+
+  /* ════════════════════════════
+     PANELS
+  ════════════════════════════ */
+  .panel {
+    position: fixed; inset: 0;
+    display: none; flex-direction: column;
+    z-index: 100; overflow: hidden;
+    background: #000;
+  }
+  .panel.open { display: flex; }
+
+  .panel-head {
+    flex-shrink: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: max(env(safe-area-inset-top), 20px) 28px 20px;
+  }
+  .panel-title { font-family: 'Playfair Display', serif; font-size: 20px; }
+
+  .btn-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #fff; background: #141414;
+    border: none; cursor: pointer;
+    padding: 9px 18px; border-radius: 20px;
+    transition: background 0.2s;
+  }
+  .btn-pill:active { background: #2a2a2a; }
+
+  .panel-scroll { flex: 1; overflow-y: auto; padding: 0 28px 120px; }
+
+  /* ════════════════════════════
+     STATS
+  ════════════════════════════ */
+  /* Trend banner */
+  #trend-banner {
+    background: #0d0d0d;
+    border: 1px solid #1a1a1a;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 28px;
+    position: relative;
+    display: none;
+  }
+  #trend-banner.visible { display: block; }
+
+  .trend-label {
+    font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #444; margin-bottom: 8px;
+  }
+  .trend-text { font-size: 13px; font-weight: 300; line-height: 1.6; color: #888; }
+
+  .trend-close {
+    position: absolute; top: 12px; right: 14px;
+    font-size: 16px; color: #333; background: none; border: none;
+    cursor: pointer; line-height: 1;
+  }
+  .trend-close:active { color: #666; }
+
+  .stats-section { margin-bottom: 26px; }
+  .stats-habit-name {
+    font-size: 11px; letter-spacing: 0.12em; color: #3a3a3a;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  .stats-bar-row { display: flex; align-items: center; gap: 14px; }
+  .stats-bar-bg { flex: 1; height: 1px; background: #0d0d0d; position: relative; }
+  .stats-bar-fill {
+    position: absolute; left: 0; top: 0; height: 1px; background: #fff;
+    transition: width 0.9s cubic-bezier(.4,0,.2,1);
+  }
+  .stats-pct { font-size: 11px; color: #2a2a2a; width: 34px; text-align: right; flex-shrink: 0; }
+  .stats-count { font-size: 10px; color: #1e1e1e; margin-top: 4px; }
+
+  .export-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #000; background: #fff;
+    border: none; cursor: pointer;
+    padding: 14px; border-radius: 12px;
+    width: 100%; text-align: center;
+    transition: opacity 0.15s;
+    margin-top: 16px;
+  }
+  .export-btn:active { opacity: 0.7; }
+
+  /* ════════════════════════════
+     SETTINGS
+  ════════════════════════════ */
+  #settings-panel { background: #050505; }
+
+  .habit-card {
+    background: #0d0d0d;
+    border-radius: 16px;
+    padding: 18px 18px 14px;
+    margin-bottom: 10px;
+  }
+
+  .habit-card-top {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .habit-card-input {
+    flex: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 15px; font-weight: 300;
+    color: #fff; background: none; border: none; outline: none;
+    min-width: 0;
+  }
+  .habit-card-input::placeholder { color: #222; }
+
+  .card-del {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #1a1a1a; border: none; cursor: pointer;
+    color: #444; font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s; line-height: 1;
+  }
+  .card-del:active { background: #333; color: #fff; }
+
+  .day-toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .day-toggle {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #333; background: #141414;
+    border: none; cursor: pointer;
+    padding: 6px 10px; border-radius: 20px;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .day-toggle.on { color: #000; background: #fff; }
+
+  .settings-footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 14px 28px; padding-bottom: max(14px, env(safe-area-inset-bottom));
+    background: linear-gradient(to top, #050505 65%, transparent);
+    display: flex; gap: 10px;
+  }
+
+  .add-btn {
+    flex: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
+    color: #000; background: #fff;
+    border: none; cursor: pointer;
+    padding: 14px; border-radius: 12px;
+    transition: opacity 0.15s;
+  }
+  .add-btn:active { opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<div id="today-view">
+  <div class="day-label" id="day-label"></div>
+  <div id="habit-list"></div>
+</div>
+
+<!-- invisible tap zones: left=stats, right=edit -->
+<div id="gesture-stats" onclick="openStats()"></div>
+<div id="gesture-edit" onclick="openSettings()"></div>
+
+<!-- ── STATS ── -->
+<div class="panel" id="stats-panel">
+  <div class="panel-head">
+    <span class="panel-title">Stats</span>
+    <button class="btn-pill" onclick="closePanel('stats-panel')">Close</button>
+  </div>
+  <div class="panel-scroll">
+    <div id="trend-banner">
+      <div class="trend-label">✦ trend detected</div>
+      <div class="trend-text" id="trend-text"></div>
+      <button class="trend-close" onclick="hideTrend()">×</button>
+    </div>
+    <div id="stats-content"></div>
+    <button class="export-btn" onclick="exportCSV()">Export CSV → Google Sheets</button>
+  </div>
+</div>
+
+<!-- ── SETTINGS ── -->
+<div class="panel" id="settings-panel">
+  <div class="panel-head" style="background:#050505;">
+    <span class="panel-title">Habits</span>
+    <button class="btn-pill" onclick="closeSettings()">Done</button>
+  </div>
+  <div class="panel-scroll" id="habit-cards"></div>
+  <div class="settings-footer">
+    <button class="add-btn" onclick="addHabitCard()">+ New habit</button>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────
+// DATA MODEL
+// habits: [ { id, name, days:[0-6] } ]
+// completions: { "2024-01-15": ["id1","id2"] }
+// ─────────────────────────────
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const SHORT = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function uid() { return Math.random().toString(36).slice(2,9); }
+
+function defaultHabits() {
+  return [
+    { id: uid(), name: 'Morning stretch', days: [1,2,3,4,5] },
+    { id: uid(), name: 'Cold shower',     days: [1,3,5] },
+    { id: uid(), name: 'Journal',         days: [1,3,5,0] },
+    { id: uid(), name: 'Walk outside',    days: [0,2,4,6] },
+    { id: uid(), name: 'No phone 1h',     days: [0,1,2,3,4,5,6] },
+  ];
+}
+
+let habits     = JSON.parse(localStorage.getItem('habits2') || 'null') || defaultHabits();
+let completions = JSON.parse(localStorage.getItem('completions2') || '{}');
+
+function save() {
+  localStorage.setItem('habits2', JSON.stringify(habits));
+  localStorage.setItem('completions2', JSON.stringify(completions));
+}
+
+function todayKey() { return new Date().toISOString().slice(0,10); }
+function todayDow() { return new Date().getDay(); }
+
+// ─────────────────────────────
+// TODAY
+// ─────────────────────────────
+function todayHabits() {
+  const dow = todayDow();
+  return habits.filter(h => h.days.includes(dow));
+}
+
+function renderToday() {
+  const dow = todayDow();
+  const key = todayKey();
+  const forToday = todayHabits();
+  const done = completions[key] || [];
+  const remaining = forToday.filter(h => !done.includes(h.id));
+
+  document.getElementById('day-label').textContent =
+    DAYS[dow] + ' · ' + new Date().toLocaleDateString('en-US', {month:'long', day:'numeric'});
+
+  const container = document.getElementById('habit-list');
+  container.innerHTML = '';
+
+  if (forToday.length === 0) {
+    container.innerHTML = '<div class="phrase">nothing today</div>';
+    return;
+  }
+  if (remaining.length === 0) {
+    container.innerHTML = '<div class="phrase">all done</div>';
+    return;
+  }
+
+  remaining.forEach(habit => {
+    const row = document.createElement('div');
+    row.className = 'habit-item';
+    row.innerHTML = `
+      <div class="habit-name">${escHtml(habit.name)}</div>
+      <div class="habit-check">
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+          <path d="M1 4L3.5 6.5L9 1" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>`;
+    row.addEventListener('click', () => complete(habit, row));
+    container.appendChild(row);
+  });
+}
+
+function complete(habit, el) {
+  el.classList.add('completing');
+  setTimeout(() => {
+    const key = todayKey();
+    if (!completions[key]) completions[key] = [];
+    if (!completions[key].includes(habit.id)) completions[key].push(habit.id);
+    save();
+    renderToday();
+  }, 330);
+}
+
+// ─────────────────────────────
+// STATS + TRENDS
+// ─────────────────────────────
+function openStats() {
+  renderStats();
+  document.getElementById('stats-panel').classList.add('open');
+}
+
+function renderStats() {
+  const container = document.getElementById('stats-content');
+  container.innerHTML = '';
+
+  // Build per-habit stats
+  const statsMap = {}; // id -> { name, opp, done, weekly:[] last8weeks }
+  habits.forEach(h => {
+    statsMap[h.id] = { name: h.name, opp: 0, done: 0, weekly: Array(8).fill(null).map(() => ({o:0,d:0})) };
+  });
+
+  const dates = Object.keys(completions).sort();
+  if (dates.length === 0 && Object.keys(completions).length === 0) {
+    // seed some fake data for demo if no real data
+  }
+
+  const today = new Date(todayKey());
+  const eightWeeksAgo = new Date(today);
+  eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
+
+  // iterate every day since first completion
+  const allDates = getAllDates();
+  allDates.forEach(dk => {
+    const d = new Date(dk + 'T12:00:00');
+    const dow = d.getDay();
+    const done = completions[dk] || [];
+    const weekIdx = Math.max(0, Math.min(7, Math.floor((today - d) / (7 * 86400000))));
+
+    habits.forEach(h => {
+      if (!h.days.includes(dow)) return;
+      if (!statsMap[h.id]) statsMap[h.id] = { name: h.name, opp: 0, done: 0, weekly: Array(8).fill(null).map(() => ({o:0,d:0})) };
+      statsMap[h.id].opp++;
+      statsMap[h.id].weekly[7 - weekIdx].o++;
+      if (done.includes(h.id)) {
+        statsMap[h.id].done++;
+        statsMap[h.id].weekly[7 - weekIdx].d++;
+      }
+    });
+  });
+
+  // Render
+  habits.forEach(h => {
+    const s = statsMap[h.id];
+    if (!s || s.opp === 0) return;
+    const pct = s.opp > 0 ? Math.round(s.done / s.opp * 100) : 0;
+    const sec = document.createElement('div');
+    sec.className = 'stats-section';
+    sec.innerHTML = `
+      <div class="stats-habit-name">${escHtml(s.name)}</div>
+      <div class="stats-bar-row">
+        <div class="stats-bar-bg"><div class="stats-bar-fill" style="width:${pct}%"></div></div>
+        <div class="stats-pct">${pct}%</div>
+      </div>
+      <div class="stats-count">${s.done} of ${s.opp} days</div>`;
+    container.appendChild(sec);
+  });
+
+  if (container.children.length === 0) {
+    container.innerHTML = '<div class="phrase" style="font-size:16px;color:#1a1a1a">no data yet</div>';
+  }
+
+  // Trends
+  detectTrends(statsMap);
+}
+
+function getAllDates() {
+  const keys = Object.keys(completions);
+  if (keys.length === 0) return [];
+  const start = new Date(keys.sort()[0] + 'T12:00:00');
+  const end = new Date(todayKey() + 'T12:00:00');
+  const result = [];
+  let d = new Date(start);
+  while (d <= end) {
+    result.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate() + 1);
+  }
+  return result;
+}
+
+function detectTrends(statsMap) {
+  const banner = document.getElementById('trend-banner');
+  const trendText = document.getElementById('trend-text');
+  const trends = [];
+
+  Object.values(statsMap).forEach(s => {
+    if (s.opp < 5) return;
+    const pct = s.done / s.opp;
+
+    // Check last 2 weeks vs previous 2 weeks
+    const recent = s.weekly.slice(6, 8); // last 2 weeks
+    const prev   = s.weekly.slice(4, 6); // weeks 3-4
+    const recentRate = sumRate(recent);
+    const prevRate   = sumRate(prev);
+
+    if (recentRate !== null && prevRate !== null) {
+      const delta = recentRate - prevRate;
+      if (delta > 0.25 && recentRate > 0.5) {
+        trends.push(`<b>${s.name}</b> is trending up — ${Math.round(recentRate*100)}% this fortnight vs ${Math.round(prevRate*100)}% before.`);
+      } else if (delta < -0.25 && prevRate > 0.4) {
+        trends.push(`<b>${s.name}</b> is slipping — ${Math.round(recentRate*100)}% recently vs ${Math.round(prevRate*100)}% before.`);
+      }
+    }
+
+    // Streak check
+    if (pct === 1 && s.opp >= 7) {
+      trends.push(`<b>${s.name}</b> — perfect record so far, ${s.done} for ${s.opp}.`);
+    }
+
+    // Consistency
+    if (pct > 0.85 && s.opp >= 10) {
+      trends.push(`<b>${s.name}</b> is your most consistent habit at ${Math.round(pct*100)}%.`);
+    }
+    if (pct < 0.35 && s.opp >= 7) {
+      trends.push(`<b>${s.name}</b> is being skipped a lot — only ${Math.round(pct*100)}% completion.`);
+    }
+  });
+
+  if (trends.length > 0) {
+    trendText.innerHTML = trends[0];
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+}
+
+function sumRate(weeks) {
+  const o = weeks.reduce((a,w) => a + w.o, 0);
+  const d = weeks.reduce((a,w) => a + w.d, 0);
+  return o >= 3 ? d / o : null;
+}
+
+function hideTrend() {
+  document.getElementById('trend-banner').classList.remove('visible');
+}
+
+// ─────────────────────────────
+// SETTINGS
+// ─────────────────────────────
+function openSettings() {
+  renderCards();
+  document.getElementById('settings-panel').classList.add('open');
+}
+
+function closeSettings() {
+  saveCards();
+  save();
+  renderToday();
+  closePanel('settings-panel');
+}
+
+function renderCards() {
+  const container = document.getElementById('habit-cards');
+  container.innerHTML = '';
+  habits.forEach((h, idx) => {
+    const card = document.createElement('div');
+    card.className = 'habit-card';
+    card.dataset.id = h.id;
+
+    const togglesHtml = SHORT.map((s, i) =>
+      `<button class="day-toggle ${h.days.includes(i) ? 'on' : ''}" data-day="${i}" onclick="toggleDay(this, '${h.id}', ${i})">${s}</button>`
+    ).join('');
+
+    card.innerHTML = `
+      <div class="habit-card-top">
+        <input class="habit-card-input" type="text" value="${escAttr(h.name)}" placeholder="habit name">
+        <button class="card-del" onclick="deleteHabit('${h.id}')">×</button>
+      </div>
+      <div class="day-toggles">${togglesHtml}</div>`;
+    container.appendChild(card);
+  });
+}
+
+function toggleDay(btn, habitId, day) {
+  const h = habits.find(h => h.id === habitId);
+  if (!h) return;
+  if (h.days.includes(day)) {
+    h.days = h.days.filter(d => d !== day);
+    btn.classList.remove('on');
+  } else {
+    h.days.push(day);
+    btn.classList.add('on');
+  }
+}
+
+function saveCards() {
+  document.querySelectorAll('#habit-cards .habit-card').forEach(card => {
+    const id = card.dataset.id;
+    const h = habits.find(h => h.id === id);
+    if (!h) return;
+    const input = card.querySelector('.habit-card-input');
+    h.name = input.value.trim();
+  });
+  habits = habits.filter(h => h.name);
+}
+
+function deleteHabit(id) {
+  saveCards();
+  habits = habits.filter(h => h.id !== id);
+  save();
+  renderCards();
+}
+
+function addHabitCard() {
+  saveCards();
+  const dow = todayDow();
+  habits.push({ id: uid(), name: '', days: [dow] });
+  save();
+  renderCards();
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.habit-card-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 60);
+}
+
+// ─────────────────────────────
+// EXPORT
+// ─────────────────────────────
+function exportCSV() {
+  const allDates = getAllDates();
+  if (allDates.length === 0) { alert('No data to export yet.'); return; }
+
+  let csv = 'Date,Day,' + habits.map(h => `"${h.name}"`).join(',') + '\n';
+  allDates.forEach(dk => {
+    const d = new Date(dk + 'T12:00:00');
+    const dow = d.getDay();
+    const done = completions[dk] || [];
+    const row = [dk, DAYS[dow]];
+    habits.forEach(h => {
+      if (!h.days.includes(dow)) row.push('N/A');
+      else row.push(done.includes(h.id) ? '1' : '0');
+    });
+    csv += row.join(',') + '\n';
+  });
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'habits.csv';
+  a.click();
+}
+
+// ─────────────────────────────
+// UTILS
+// ─────────────────────────────
+function closePanel(id) { document.getElementById(id).classList.remove('open'); }
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escAttr(str) {
+  return str.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Init
+renderToday();
+</script>
+</body>
+</html>
